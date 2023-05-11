@@ -1,0 +1,12 @@
+node {
+    withEnv(["TERRAFORM_FOLDER=/home/ubuntu/gcp/terraform"]){
+
+    stage('Terraform Destroy') {
+        slackSend color: "good", message: "Terraform init ..."
+        sh script: '''
+            chdir ${TERRAFORM_FOLDER}
+            terraform destroy --auto-approve
+        '''    
+    }
+    }
+}

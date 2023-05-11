@@ -1,0 +1,4 @@
+[kafka_nodes]
+1 ansible_host=13.51.242.108
+2 ansible_host=13.49.46.113
+3 ansible_host=13.48.71.249

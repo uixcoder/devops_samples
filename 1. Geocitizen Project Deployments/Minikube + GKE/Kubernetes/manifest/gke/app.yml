@@ -1,0 +1,56 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: geo-deployment-autoscaling
+  labels:    
+    project : geocitizen
+spec:
+  selector:
+    matchLabels:
+      project: geocitizen-app
+  template:
+    metadata:
+      labels:
+        project: geocitizen-app  # Service will look for those PODS Labels!!!
+    spec:
+      containers:
+      - name : app-web
+        image: docker.io/xbuyer/data:geo_minikube_v2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080  
+      imagePullSecrets:
+      - name: geosecret
+
+---
+apiVersion: autoscaling/v1
+kind: HorizontalPodAutoscaler
+metadata:
+  name: geo-autoscaler
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: geo-deployment-autoscaling
+  minReplicas: 2
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 50
+
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: geo-app-pod-service
+  labels:
+     env  : test
+     owner: uixcoder
+spec:
+  selector:
+    project:  geocitizen-app      # Selecting PODs with those Labels
+  ports:
+    - name      : app-listener
+      protocol  : TCP
+      port      : 80  # Port on Load Balancer
+      targetPort: 8080  # Port on Pod
+  type: LoadBalancer

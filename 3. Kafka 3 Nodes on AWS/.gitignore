@@ -1,0 +1,5 @@
+**/Ansible/Kafka
+**/Terraform/.terraform
+**/Terraform/.terraform.lock.hcl
+**/Terraform/terraform.*
+**/Terraform/tf.out

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+server_ip='GeoLB-2091803055.eu-north-1.elb.amazonaws.com'
+db_server_ip='dbgeo.ddns.net'

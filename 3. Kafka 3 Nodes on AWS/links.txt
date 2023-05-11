@@ -1,0 +1,35 @@
+VPC manual
+https://rtfm.co.ua/aws-vpc-vvedenie-primery/
+vpc+subnets+bonus
+https://medium.com/@aliatakan/terraform-create-a-vpc-subnets-and-more-6ef43f0bf4c1
+
+aws free tier kafka
+https://www.linkedin.com/pulse/kafka-aws-free-tier-steven-aranibar/
+
+
+Ansible playbook
+https://www.middlewareinventory.com/blog/ansible-playbook-kafka/
+
+kafka architecture + conductor
+https://www.conduktor.io/blog/kafka-architecture
+
+Listeners config for different networks
+https://sdbrett.com/post/2022-08-01-kafka-listeners/
+
+
+https://github.com/bodnarmykola/DevOps-Big-Data/wiki/Kafka
+
+Commands to test kafka
+
+/opt/kafka/bin/kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 3 --partitions 3 --topic GeneralTopic
+
+/opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+
+/opt/kafka/bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic GeneralTopic
+
+/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic GeneralTopic --from-beginning
+
+- list brockers
+
+/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 | awk '/id/{print $1}'
+

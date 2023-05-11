@@ -1,0 +1,33 @@
+This project is parameterized ?
+Active Choices Reactive Parameter
+Name
+
+Version
+
+Groovy Script
+
+import groovy.json.*
+
+def targetUrl = "http://10.1.1.51:8081/service/rest/v1/search?repository=geocitizen-release&format=maven2&group=com.softserveinc&name=geo-citizen"
+def jsonSlupper = new JsonSlurper().parse(URI.create(targetUrl).toURL())
+def list = jsonSlupper["items"]["version"].collect().sort().reverse()
+
+------------------------------------------------------------
+
+node {
+    withEnv(["ANSIBLE_FOLDER=/home/ubuntu/gcp/ansible"]){
+
+    stage('Get .war file from Nexus repository') {
+        sh script: '''
+            curl -L -X GET "http://10.1.1.51:8081/service/rest/v1/search/assets/download?repository=geocitizen-release&group=com.softserveinc&name=geo-citizen&version=${Version}&maven.extension=war&maven.classifier" --output ${ANSIBLE_FOLDER}/files/citizen.war
+        '''   
+    }
+    
+    stage('Deploy application with ansible') {
+        sh script: '''
+            chdir ${ANSIBLE_FOLDER}
+            ansible-playbook playbook3.yml
+        '''    
+    }
+    }
+}

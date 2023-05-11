@@ -1,0 +1,15 @@
+- Commands to test kafka
+
+/opt/kafka/bin/kafka-topics.sh --create --bootstrap-server localhost:9092 --replication-factor 3 --partitions 3 --topic GeneralTopic
+
+/opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+
+/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --describe --topic GeneralTopic
+
+/opt/kafka/bin/kafka-console-producer.sh --bootstrap-server localhost:9092 --topic GeneralTopic
+
+/opt/kafka/bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic GeneralTopic --from-beginning
+
+- list brockers
+
+/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 | awk '/id/{print $1}'

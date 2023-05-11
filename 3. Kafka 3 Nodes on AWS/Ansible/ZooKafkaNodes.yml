@@ -1,0 +1,316 @@
+---
+- name: Configure Zookeper/Kafka Nodes
+  hosts: kafka_nodes
+  vars:
+    - kafka_dir: /opt/kafka
+    - zookeeper_dir: /opt/zookeeper
+    - kafka_log_dir: /kafka
+    - zookeeper_data_dir: /zookeeper
+
+    - kafka_nodes_public_ips_with_port: "{{ groups['kafka_nodes'] | map('extract', hostvars, ['ansible_host']) | join(':2181,') }}:2181"
+    - kafka_nodes_internal_ips_with_port: "{{ groups['kafka_nodes'] | map('extract', hostvars, ['ansible_default_ipv4'])| map(attribute='address') | list | join(':2181,') }}:2181"
+
+    - servers: "{{ groups['kafka_nodes'] | map('extract', hostvars, ['inventory_hostname']) | list}}"
+    - servers_list: "{{ ['server'] | product(servers) | map('join', '.') | list }} "
+    - ip_list: "{{ groups['kafka_nodes'] | map('extract', hostvars, ['ansible_default_ipv4'])| map(attribute='address') | list }}"
+
+    - ip: "{{hostvars[inventory_hostname]['ansible_default_ipv4']['address'] }} "
+
+    - zookeeper_nodes_internal_ips_with_ports: "{{servers_list | zip(ip_list) | map('join', '=') | list | join(':2888:3888\n')}}:2888:3888\n"
+  become: yes
+  become_method: sudo
+  remote_user: ubuntu
+
+  tasks:
+    - name: Create swap space 1G
+      become: yes
+      shell: |
+        swapoff -a
+        dd if=/dev/zero of=/swapfile bs=1M count=1024
+        chmod 0600 /swapfile
+        mkswap /swapfile
+        swapon /swapfile
+
+    - name: Update APT package manager repositories cache
+      apt:
+        update_cache: yes
+
+    - name: Install OpenJDK Java 11
+      apt:
+        name: openjdk-11-jdk
+        state: present
+
+    # delete old zookeper install if needed
+    - name: Delete content & directory
+      file:
+        state: absent
+        path: "{{zookeeper_dir}}"
+    - name: Delete content & directory
+      file:
+        state: absent
+        path: "{{zookeeper_data_dir}}"
+
+    # zookeeper install part
+
+    - name: Create "zookeeper" group
+      group:
+        name: zookeeper
+        state: present
+
+    - name: Create "zookeeper" user
+      user:
+        name: zookeeper
+        shell: /bin/false
+        state: present
+        group: zookeeper
+
+    - name: Create /opt/zookeeper install directory
+      file:
+        path: "{{zookeeper_dir}}"
+        state: directory
+        mode: 0755
+        owner: zookeeper
+        group: zookeeper
+
+    - name: Create zookeeper data directory
+      file:
+        path: "{{zookeeper_data_dir}}"
+        state: directory
+        mode: 0755
+        owner: zookeeper
+        group: zookeeper
+
+    - name: Add zookeeper id to myid file
+      shell: |
+        echo "{{inventory_hostname}}" > {{zookeeper_data_dir}}/myid
+
+    - name: download & unarchive zookeeper
+      unarchive:
+        src: https://dlcdn.apache.org/zookeeper/zookeeper-3.7.1/apache-zookeeper-3.7.1-bin.tar.gz
+        remote_src: yes
+        dest: "{{zookeeper_dir}}"
+        extra_opts: [--strip-components=1]
+
+    - name: Create a ZooKeeper config file
+      copy:
+        dest: "{{zookeeper_dir}}/conf/zoo.cfg"
+        content: |
+          tickTime=2000
+          dataDir={{zookeeper_data_dir}}
+          clientPort=2181
+          initLimit=5
+          syncLimit=2
+          {{zookeeper_nodes_internal_ips_with_ports}}
+        mode: 0755
+
+    - name: Create a Service file for ZooKeeper
+      copy:
+        dest: /etc/systemd/system/zookeeper.service
+        content: |
+          [Unit]
+          Requires=network.target remote-fs.target
+          After=network.target remote-fs.target
+          [Service]
+          Type=forking
+          WorkingDirectory={{zookeeper_dir}}
+          User=zookeeper
+          Group=zookeeper
+          User=zookeeper
+          ExecStart={{zookeeper_dir}}/bin/zkServer.sh start {{zookeeper_dir}}/conf/zoo.cfg
+          ExecStop={{zookeeper_dir}}/bin/zkServer.sh stop {{zookeeper_dir}}/conf/zoo.cfg
+          TimeoutSec=30
+          Restart=on-failure
+          [Install]
+          WantedBy=multi-user.target
+        mode: 0755
+
+    - name: Change ownership of /opt/zookeeper directory
+      file:
+        path: "{{zookeeper_dir}}"
+        owner: zookeeper
+        group: zookeeper
+        mode: "u+rwx,g+rx,o=rx"
+        recurse: yes
+        state: directory
+
+    - name: Change ownership of /zookeeper directory
+      file:
+        path: "{{zookeeper_data_dir}}"
+        owner: zookeeper
+        group: zookeeper
+        mode: "u+rwx,g+rx,o=rx"
+        recurse: yes
+        state: directory
+
+    - name: Start / Enable Zookeeper
+      shell: |
+        systemctl daemon-reload
+        systemctl start zookeeper
+        systemctl enable zookeeper
+
+    # delete old kafka install if needed
+    - name: Delete content & directory
+      file:
+        state: absent
+        path: "{{kafka_dir}}"
+    - name: Delete content & directory
+      file:
+        state: absent
+        path: "{{kafka_log_dir}}"
+
+    # kafka install part
+    - name: Create "kafka" group
+      group:
+        name: kafka
+        state: present
+
+    - name: Create "kafka" user
+      user:
+        name: kafka
+        shell: /bin/false
+        state: present
+        group: kafka
+
+    - name: Create /opt/kafka install directory
+      file:
+        path: "{{kafka_dir}}"
+        state: directory
+        mode: 0755
+        owner: kafka
+        group: kafka
+
+    - name: Create kafka log directory
+      file:
+        path: "{{kafka_log_dir}}"
+        state: directory
+        mode: 0755
+        owner: kafka
+        group: kafka
+
+    - name: download & unarchive kafka
+      unarchive:
+        # src: https://archive.apache.org/dist/kafka/3.2.1/kafka_2.13-3.2.1.tgz
+        # As of slow connection, archive is downloaded locally to Kafka folder on Ansible Node
+        # remote_src: yes
+        src: Kafka/kafka_2.13-3.2.1.tgz
+        dest: "{{kafka_dir}}"
+        extra_opts: [--strip-components=1]
+
+    - name: Update the kafka log path
+      replace:
+        path: "{{kafka_dir}}/config/server.properties"
+        regexp: "log.dirs=(.+)"
+        replace: "log.dirs={{kafka_log_dir}}"
+        backup: yes
+
+    - name: Update kafka broker.id line
+      replace:
+        path: "{{kafka_dir}}/config/server.properties"
+        regexp: "broker.id=(.+)"
+        replace: "broker.id={{inventory_hostname}}"
+        backup: yes
+
+    - name: Update kafka zookeeper.connect line
+      replace:
+        path: "{{kafka_dir}}/config/server.properties"
+        regexp: "zookeeper.connect=(.+)"
+        # replace: "zookeeper.connect={{ip_list | difference(ip)| join(':2181,') }}:2181"
+        replace: "zookeeper.connect={{kafka_nodes_internal_ips_with_port}}"
+        backup: yes
+
+    - name: Change ownership of /opt/kafka directory
+      file:
+        path: "{{kafka_dir}}"
+        owner: kafka
+        group: kafka
+        mode: "u+rwx,g+rx,o=rx"
+        recurse: yes
+        state: directory
+
+    - name: Change ownership of /kafka directory
+      file:
+        path: "{{kafka_log_dir}}"
+        owner: kafka
+        group: kafka
+        mode: "u+rwx,g+rx,o=rx"
+        recurse: yes
+        state: directory
+
+    - name: Create a Service file for Kafka
+      copy:
+        dest: /etc/systemd/system/kafka.service
+        content: |
+          [Unit]
+          Requires=zookeeper.service
+          After=zookeeper.service
+          [Service]
+          Type=simple
+          User=kafka
+          ExecStart=/bin/sh -c '{{kafka_dir}}/bin/kafka-server-start.sh {{kafka_dir}}/config/server.properties > {{kafka_dir}}/kafkaservice.log 2>&1'
+          ExecStop={{kafka_dir}}/bin/kafka-server-stop.sh
+          Restart=on-abnormal
+          [Install]
+          WantedBy=multi-user.target
+        mode: 0755
+
+    - name: Start Services
+      tags: startservices
+      systemd:
+        name: "{{item}}"
+        state: started
+        enabled: yes
+      with_items:
+        - "kafka"
+
+    # - name: Validating if zookeeper is up and listening on port 2181
+    #   wait_for:
+    #     host: localhost
+    #     port: 2181
+    #     delay: 10
+    #     timeout: 60
+    #     state: started
+    #     msg: "Zookeeper not seem to be running"
+
+    # - name: Validating if Kafka is up and listening on port 9092
+    #   wait_for:
+    #     host: localhost
+    #     port: 9092
+    #     delay: 10
+    #     timeout: 30
+    #     state: started
+    #     msg: "Kafka not seem to be running"
+
+    # # - name: Add replica factor
+    # #   lineinfile:
+    # #     path: "{{install_dir}}/config/server.properties"
+    # #     regexp: "default.replication.factor=(.*)\nmin.insync.replicas=(.*)"
+    # #     insertafter: "^broker.id=(.*)"
+    # #     line: "default.replication.factor=3\nmin.insync.replicas=2"
+
+    # # - name: Update zookeeper servers list
+    # #   lineinfile:
+    # #     path: "{{install_dir}}/config/zookeeper.properties"
+    # #     regexp: 'server.\d*=(.*)\nserver.\d*=(.*)\nserver.\d*=(.*)'
+    # #     insertafter: "^# admin.serverPort=8080 "
+    # #     # line: ""
+    # #     line: "{{zookeeper_nodes_internal_ips_with_ports}}"
+
+    # # Change Java memory limits for Kafka and Zookeeper
+
+    # # - name: Update the Java Heap Size for Kafka
+    # #   become: yes
+    # #   # become_user: kafka
+    # #   replace:
+    # #     path: "{{install_dir}}/bin/kafka-server-start.sh"
+    # #     regexp: 'export KAFKA_HEAP_OPTS=(".+")'
+    # #     replace: 'export KAFKA_HEAP_OPTS="-Xmx1024M -Xms1024M"'
+    # #     backup: yes
+
+    # # - name: Update the Java Heap Size for Zookeeper
+    # #   become: yes
+    # #   # become_user: kafka
+    # #   replace:
+    # #     path: "{{install_dir}}/bin/zookeeper-server-start.sh"
+    # #     regexp: 'export KAFKA_HEAP_OPTS=(".+")'
+    # #     replace: 'export KAFKA_HEAP_OPTS="-Xmx512M -Xms512M"'
+    # #     backup: yes

@@ -1,0 +1,38 @@
+pipeline{
+
+    agent any
+    tools {
+     maven 'Maven'
+     git 'Default'
+    }
+    stages {
+        stage ('Git checkout'){
+            steps {
+                git branch: 'main', url: 'https://github.com/idanylyuk/Geocit134.git'
+            }
+        }    
+        stage('Fix App'){
+            steps{
+                sh "cp /home/ubuntu/kubernetes/hosts_geo '${WORKSPACE}'"
+                sh "cp /home/ubuntu/kubernetes/deploy '${WORKSPACE}'"
+                sh '${WORKSPACE}/deploy'
+            }
+        }
+        stage('Build App') {
+            steps {
+                sh 'mvn -version'
+                sh 'mvn clean install'
+                sh "cp '${WORKSPACE}'/target/citizen.war /home/ubuntu/kubernetes/ "
+                
+                
+            }
+        }
+        stage('Build Docker image') {
+            steps{
+                  sh "docker build -t xbuyer/data:geo_minikube /home/ubuntu/kubernetes/"
+                  //sh "docker push xbuyer/data:geo_minikube"
+            }
+        }         
+    }   
+}    
+

@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# install supervisor, sshd, git
+
+apt-get update
+
+apt-get install -y openssh-server supervisor git
+
+mkdir -p /var/run/sshd /var/log/supervisor
+
+# install JAVA
+
+apt-get install -y openjdk-11-jre
+
+#install tomcat
+
+wget https://dlcdn.apache.org/tomcat/tomcat-9/v9.0.62/bin/apache-tomcat-9.0.62.tar.gz
+
+mkdir /opt/tomcat
+
+tar xzvf apache-tomcat-9*tar.gz -C /opt/tomcat --strip-components=1
+
+# install maven
+
+apt install -y maven
+
+# install postgresql
+
+apt install -y postgresql postgresql-contrib
+
+# database config
+
+/etc/init.d/postgresql start
+
+su - postgres -c "psql --command \"CREATE USER docker WITH SUPERUSER PASSWORD 'docker';\" && createdb -O docker docker"
+
+/etc/init.d/postgresql stop
+
+# postgresql config 
+
+echo "host all  all    0.0.0.0/0  md5" >> /etc/postgresql/10/main/pg_hba.conf
+
+echo "listen_addresses='*'" >> /etc/postgresql/10/main/postgresql.conf

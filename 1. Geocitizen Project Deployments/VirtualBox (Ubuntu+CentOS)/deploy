@@ -1,0 +1,44 @@
+#!/bin/bash
+
+#remove old files
+rm -rf Geocit134
+
+# Clone git repository
+git clone https://github.com/mentorchita/Geocit134.git
+cd Geocit134
+
+
+server_ip='10.1.1.112'
+db_server_ip='10.1.1.110'
+db_name='db_name'
+db_user='db_user'
+db_password='db_password'
+gmail_user='gmail_user'
+gmail_password='gmail_user_password'
+#fix pom.xml file bugs
+find . -type f -name "pom.xml" -exec sed -i 's/http:\/\/repo.spring.io/https:\/\/repo.spring.io/g' {} +
+find . -type f -name "pom.xml" -exec sed -i 's/<distributionManagement>/<!--<distributionManagement>/g' {} +
+find . -type f -name "pom.xml" -exec sed -i 's/<\/distributionManagement>/<\/distributionManagement>-->/g' {} +
+
+#fix database application connection
+find . -type f -name "application.properties" -exec sed -i "s/http:\/\/localhost/http:\/\/$server_ip/g" {} +
+find . -type f -name "application.properties" -exec sed -i "s/postgresql:\/\/localhost:5432\/ss_demo_1/postgresql:\/\/$db_server_ip:5432\/$db_name/g" {} +
+find . -type f -name "application.properties" -exec sed -i "s/postgresql:\/\/35.204.28.238:5432\/ss_demo_1/postgresql:\/\/$db_server_ip:5432\/$db_name/g" {} +
+find . -type f -name "application.properties" -exec sed -i "s/username=postgres/username=$db_user/g" {} +
+find . -type f -name "application.properties" -exec sed -i "s/password=postgres/password=$db_password/g" {} +
+
+# fix js localhost bugs
+find . -type f -name "*.js" -exec sed -i "s/localhost:8080/$server_ip:8080/g" {} +
+
+# fix e-mail data
+find . -type f -name "application.properties" -exec sed -i "s/ssgeocitizen/$gmail_user/g" {} +
+find . -type f -name "application.properties" -exec sed -i "s/password=softserve/password=$gmail_password/g" {} +
+
+#fix favicon
+find . -type f -name "index.html" -exec sed -i "s/\/src\/assets/\.\/static/g" {} +
+
+#build project
+mvn install
+
+#deploy project
+sudo mv target/citizen.war /opt/tomcat/webapps

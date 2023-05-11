@@ -1,0 +1,93 @@
+pipeline {
+    agent {label 'agent1'}
+    environment{
+       AWS_ACCESS_KEY_ID=credentials('jenkins-aws-access-key-id')
+       AWS_SECRET_ACCESS_KEY=credentials('jenkins-aws-secret-access-key')
+       AWS_REGION=credentials('jenkins-aws-default-region')
+       DB_NAME=credentials('petdbname')
+       DB_USER=credentials('petdbuser')
+       DB_PASSWORD=credentials('petdbpassword')       
+    }
+
+    tools {
+        maven "M3"
+    }
+
+    stages {
+        stage ('Get Project from repository'){
+            steps {
+                git branch: 'master', url: 'https://github.com/uixcoder/spring-framework-petclinic.git'
+                dir ('Deploy') {
+                    git branch: 'master', url: 'https://github.com/uixcoder/Deploy_AWS_EC2_RDS_MySQL.git'
+                }
+            }
+        }
+        stage ('Create AWS infrastructure'){
+            steps {
+              sh script: '''
+                    chdir Deploy/Terraform
+                    terraform init -reconfigure
+                    terraform apply --auto-approve
+              ''' 
+            }
+        }  
+        stage ('Fix error / Preconfigure Project'){
+           steps {
+                sh "chmod u+x Deploy/Ansible/app/fix"
+                sh "./Deploy/Ansible/app/fix"
+                sh "find . -type f -name 'pom.xml' -exec sed -i 's/db1_name_template/$DB_NAME/g' {} +"
+                sh "find . -type f -name 'pom.xml' -exec sed -i 's/db1_user_template/$DB_USER/g' {} +"
+                sh "find . -type f -name 'pom.xml' -exec sed -i 's/db1_password_template/$DB_PASSWORD/g' {} +"
+            }
+        }        
+        stage ('Config AWS infrastructure'){
+            steps {
+                sh "rm -f Deploy/config/ATC.pem"
+                withCredentials([file(credentialsId: 'SSH_APP_KEY', variable: 'appsshkey')]) {
+                    sh "cp \$appsshkey Deploy/config/"
+                }   
+                sh "ansible --version"
+                sh script: '''
+                    chdir Deploy/Ansible
+                    ansible-playbook configAppServer.yml
+                '''                 
+                sh "rm -f Deploy/config/ATC.pem"
+            }
+        }    
+        stage('Validate') {
+            steps {
+                sh "mvn validate"
+            }
+        }
+        stage('Compile') {
+            steps {
+                sh "mvn compile"
+            }
+        }          
+        //stage('Test Project') {
+        //    steps {
+        //        sh "mvn test"
+        //    }
+        //}          
+        stage('Build') {
+           steps {
+                sh "mvn package -Dmaven.test.skip=true"
+            }
+        }
+        stage('Deploy') {
+            steps {
+                sh "pwd"
+                sh "[ ! -f target/petclinic.war ] || mv -f target/petclinic.war target/ROOT.war"
+                sh "rm -f Deploy/config/ATC.pem"
+                withCredentials([file(credentialsId: 'SSH_APP_KEY', variable: 'appsshkey')]) {
+                    sh "cp \$appsshkey Deploy/config/"
+                }   
+                sh script: '''
+                    chdir Deploy/Ansible
+                    ansible-playbook deployApp.yml
+                '''
+                sh "rm -f Deploy/config/ATC.pem"                
+            }
+        }
+    }
+}

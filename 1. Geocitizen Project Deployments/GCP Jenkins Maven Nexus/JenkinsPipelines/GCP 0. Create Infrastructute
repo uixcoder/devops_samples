@@ -1,0 +1,17 @@
+node {
+    withEnv(["TERRAFORM_FOLDER=/home/ubuntu/gcp/terraform"]){
+
+    stage('Terraform Init') {
+        sh script: '''
+            chdir ${TERRAFORM_FOLDER}
+            terraform init
+        '''    
+    }
+    stage('Create AWS VMs with Terraform') {
+        sh script: '''
+            chdir ${TERRAFORM_FOLDER}
+            terraform apply --auto-approve
+        '''    
+    }
+    }
+}

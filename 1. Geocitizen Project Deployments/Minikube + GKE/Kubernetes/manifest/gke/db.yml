@@ -1,0 +1,45 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: geo-deployment-postgres
+  labels:    
+    project : geocitizen
+spec:
+  selector:
+    matchLabels:
+      project: geocitizen-db
+  template:
+    metadata:
+      labels:
+        project: geocitizen-db  # Service will look for those PODS Labels!!!
+    spec:
+      containers:
+        - name : app-db
+          env:
+          - name: POSTGRES_DB
+            value: Geo
+          - name: POSTGRES_USER
+            value: Geo  
+          - name: POSTGRES_PASSWORD
+            value: GeoCitizenDocker
+          image: postgres
+          ports:
+            - containerPort: 5432
+              
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: geo-db-pod-service
+  labels:
+     env  : test
+     owner: uixcoder
+spec:
+  selector:
+    project:  geocitizen-db      # Selecting PODs with those Labels
+  ports:
+    - name      : db-listener
+      protocol  : TCP
+      port      : 5432  # Port on Load Balancer
+      targetPort: 5432  # Port on Pod
+  type: NodePort           

@@ -1,0 +1,54 @@
+pipeline {
+    agent any
+    tools {
+     maven 'Maven'
+     git 'Default'
+    }
+
+    stages {
+        stage ('Git checkout'){
+            steps {
+                git branch: 'main', url: 'https://github.com/idanylyuk/Geocit134.git'
+            }
+        }    
+        stage('Fix geocitizen app'){
+            steps{
+                sh "cat /home/ubuntu/gcp/config/hosts_geo"
+                
+                sh "cp /home/ubuntu/gcp/config/hosts_geo '${WORKSPACE}'"
+                sh "cp /home/ubuntu/gcp/ansible/app/deploy '${WORKSPACE}'"
+                sh './deploy'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'mvn -version'
+                sh 'mvn clean install'
+            }
+        }
+        stage('Upload to Nexus') {
+            steps {
+                script{
+                    def mavenPom = readMavenPom file: 'pom.xml'
+                    def nexusRepoName = mavenPom.version.endsWith("SNAPSHOT") ? "geocitizen-snapshot" : "geocitizen-release"
+                    nexusArtifactUploader artifacts: [
+                        [
+                            artifactId: 'geo-citizen', 
+                            classifier: '', 
+                            file: 'target/citizen.war', 
+                            type: 'war'
+                        ]
+                    ], 
+                    credentialsId: 'Jenkins_Creds', 
+                    groupId: 'com.softserveinc', 
+                    nexusUrl: '10.1.1.51:8081', 
+                    nexusVersion: 'nexus3', 
+                    protocol: 'http', 
+                    repository: "${nexusRepoName}", 
+                    version: "${mavenPom.version}"
+                }
+            }
+        }
+    }
+}
+

@@ -1,0 +1,18 @@
+node {
+    withEnv(["ANSIBLE_FOLDER=/home/ubuntu/gcp/ansible"]){
+
+    stage('Configure App VM with Ansible') {
+        sh script: '''
+            chdir ${ANSIBLE_FOLDER}
+            ansible-playbook playbook1.yml
+        '''    
+    }
+    
+    stage('Configure Db VM with Ansible') {
+        sh script: '''
+            chdir ${ANSIBLE_FOLDER}
+            ansible-playbook playbook2.yml
+        '''    
+    }
+    }
+}

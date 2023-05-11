@@ -1,0 +1,33 @@
+---
+- name: Deploy Application
+  hosts: app_server
+  become: yes
+  become_method: sudo
+  remote_user: gcpuser
+  tasks:
+
+    - name: Stop Tomcat service
+      systemd:
+        name: tomcat
+        state: stopped
+        enabled: true
+        daemon_reload: true
+
+    - name: Deploy Application
+      copy:
+        force: yes
+        src  : citizen.war
+        dest : "/opt/tomcat/webapps"
+        mode : 0777
+        owner: ubuntu	
+        group: ubuntu
+
+      
+
+    - name: Start Tomcat service
+      systemd:
+        name: tomcat
+        state: started
+        enabled: true
+        daemon_reload: true      
+   

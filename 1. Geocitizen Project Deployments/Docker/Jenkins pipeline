@@ -1,0 +1,36 @@
+pipeline{
+
+    agent any
+    tools {
+     maven 'Maven'
+     git 'Default'
+    }
+    stages {
+        stage ('Git checkout'){
+            steps {
+                git branch: 'main', url: 'https://github.com/idanylyuk/Geocit134.git'
+            }
+        }    
+        stage('Fix App'){
+            steps{
+                sh "cp /home/ubuntu/docker/config/hosts_geo '${WORKSPACE}'"
+                sh "cp /home/ubuntu/docker/app/deploy '${WORKSPACE}'"
+                sh './deploy'
+            }
+        }
+        stage('Build App') {
+            steps {
+                sh 'mvn -version'
+                sh 'mvn clean install'
+            }
+        }
+        stage('Deploy App docker container') {
+            steps{
+                sshagent(['docker_ssh']) {
+                    sh "scp -o StrictHostKeyChecking=no target/citizen.war ubuntu@10.1.1.52:~"
+                    sh "ssh -o StrictHostKeyChecking=no ubuntu@10.1.1.52 'docker cp citizen.war App_GeoCitizen:/usr/local/tomcat/webapps'"
+                }
+            }
+        }         
+    }   
+}   
